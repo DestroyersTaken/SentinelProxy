@@ -1,0 +1,27 @@
+mixed-port: 7890
+proxies:
+  - {name: "HK", type: socks5, server: 1.2.3.4, port: 1080, username: u, password: p, udp: true}
+  - name: US
+    type: http
+    server: us.example.com
+    port: 443
+    tls: true
+    sni: us.example.com
+  - {name: "SS", type: ss, server: 5.6.7.8, port: 8388, cipher: aes-128-gcm, password: x}
+proxy-groups:
+  - name: Auto
+    type: url-test
+    proxies: [HK, US]
+    url: http://www.gstatic.com/generate_204
+    interval: 300
+  - name: Select
+    type: select
+    proxies: [Auto, HK, DIRECT]
+rules:
+  - DOMAIN-SUFFIX,google.com,Auto
+  - DOMAIN-SUFFIX,youtube.com,Auto
+  - DOMAIN-KEYWORD,ads,REJECT
+  - PROCESS-NAME,telegram.exe,Select
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - GEOIP,CN,DIRECT
+  - MATCH,Select

@@ -1,0 +1,19 @@
+{
+  "outbounds": [
+    {"type": "selector", "tag": "proxy", "outbounds": ["b", "a"], "default": "a"},
+    {"type": "socks", "tag": "a", "server": "1.1.1.1", "server_port": 1080, "version": "5", "username": "x", "password": "y"},
+    {"type": "http", "tag": "b", "server": "2.2.2.2", "server_port": 8443, "tls": {"enabled": true, "insecure": true}, "detour": "a"},
+    {"type": "vmess", "tag": "v", "server": "3.3.3.3", "server_port": 443},
+    {"type": "direct", "tag": "direct"}
+  ],
+  "route": {
+    "rules": [
+      {"action": "sniff"},
+      {"domain_suffix": ["netflix.com"], "process_name": ["chrome.exe"], "outbound": "proxy"},
+      {"port_range": ["6000:7000"], "network": "udp", "action": "reject"},
+      {"rule_set": ["geosite-cn"], "outbound": "direct"},
+      {"ip_cidr": ["192.168.0.0/16"], "outbound": "direct"}
+    ],
+    "final": "proxy"
+  }
+}

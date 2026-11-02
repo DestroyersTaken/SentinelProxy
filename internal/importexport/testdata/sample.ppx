@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ProxifierProfile version="102" platform="Windows" product_id="0" product_minver="400">
+  <Options>
+    <Resolve>
+      <AutoModeDetection enabled="false" />
+      <ViaProxy enabled="true">
+        <TryLocalDnsFirst enabled="false" />
+      </ViaProxy>
+      <ExclusionList>%ComputerName%; localhost; *.local</ExclusionList>
+    </Resolve>
+    <Encryption mode="disabled" />
+    <HttpProxiesSupport enabled="false" />
+    <HandleDirectConnections enabled="false" />
+    <ConnectionLoopDetection enabled="true" />
+    <ProcessServices enabled="false" />
+    <ProcessOtherUsers enabled="false" />
+  </Options>
+  <ProxyList>
+    <Proxy id="100" type="SOCKS5">
+      <Address>10.1.1.1</Address>
+      <Port>1080</Port>
+      <Options>48</Options>
+      <Authentication enabled="true">
+        <Username>alice</Username>
+        <Password>pw</Password>
+      </Authentication>
+    </Proxy>
+    <Proxy id="101" type="HTTPS">
+      <Address>proxy.corp.example</Address>
+      <Port>3128</Port>
+      <Options>48</Options>
+    </Proxy>
+  </ProxyList>
+  <ChainList>
+    <Chain id="102" type="simple">
+      <Name>Double</Name>
+      <Proxy enabled="true">100</Proxy>
+      <Proxy enabled="true">101</Proxy>
+    </Chain>
+    <Chain id="103" type="redundancy">
+      <Name>Backup</Name>
+      <RedundancyTimeout>5</RedundancyTimeout>
+      <Proxy enabled="true">101</Proxy>
+      <Proxy enabled="true">100</Proxy>
+    </Chain>
+  </ChainList>
+  <RuleList>
+    <Rule enabled="true">
+      <Name>Localhost</Name>
+      <Targets>localhost; 127.0.0.1; %ComputerName%; ::1</Targets>
+      <Action type="Direct" />
+    </Rule>
+    <Rule enabled="true">
+      <Name>Browsers</Name>
+      <Applications>chrome.exe; firefox.exe; "C:\Program Files\My App\app.exe"</Applications>
+      <Ports>80; 443</Ports>
+      <Action type="Proxy">100</Action>
+    </Rule>
+    <Rule enabled="false">
+      <Name>Work</Name>
+      <Targets>*.corp.example; 192.168.10.1-192.168.10.50</Targets>
+      <Action type="Chain">102</Action>
+    </Rule>
+    <Rule enabled="true">
+      <Name>Ads</Name>
+      <Targets>*.doubleclick.net</Targets>
+      <Action type="Block" />
+    </Rule>
+    <Rule enabled="true">
+      <Name>Default</Name>
+      <Action type="Chain">103</Action>
+    </Rule>
+  </RuleList>
+</ProxifierProfile>

@@ -1,0 +1,95 @@
+name: Build
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Frontend
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run check
+          pnpm run build
+      - name: Vet
+        run: |
+          go vet ./internal/...
+          GOOS=windows go vet ./...
+      - name: Test
+        run: go test -race -count=1 ./internal/...
+      - name: Live capture test (nftables)
+        run: |
+          sudo apt-get install -y nftables >/dev/null
+          sudo env "PATH=$PATH" "HOME=$HOME" "GOCACHE=$(go env GOCACHE)" "GOMODCACHE=$(go env GOMODCACHE)" SENTINEL_LIVE=1 go test -count=1 -run TestLinuxLive ./internal/intercept/
+
+  windows:
+    name: Build (Windows x64)
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Frontend
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+      - name: Test on Windows
+        run: go test -count=1 ./internal/...
+      - name: WinDivert driver
+        shell: pwsh
+        run: ./scripts/fetch-windivert.ps1
+      - name: Build
+        shell: pwsh
+        run: |
+          $version = (git describe --tags --always) -replace '^v', ''
+          go run github.com/tc-hib/go-winres@v0.3.3 make --in build/windows/winres.json --out rsrc --arch amd64
+          go build -trimpath -ldflags "-s -w -H windowsgui -X main.version=$version" -o dist/SentinelProxy/SentinelProxy.exe .
+          Copy-Item third_party/windivert/* dist/SentinelProxy/
+          Copy-Item README.md dist/SentinelProxy/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SentinelProxy-windows-x64
+          path: dist/SentinelProxy
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Compress-Archive dist/SentinelProxy/* SentinelProxy-${{ github.ref_name }}-windows-x64.zip
+          gh release create ${{ github.ref_name }} SentinelProxy-${{ github.ref_name }}-windows-x64.zip --generate-notes

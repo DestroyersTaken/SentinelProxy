@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Chrome via proxy",
+    "localhostViaProxy": false,
+    "processNames": "chrome.exe; msedge.exe",
+    "targetHosts": "*",
+    "targetPorts": "80,443",
+    "protocol": "TCP",
+    "ruleProtocol": "TCP",
+    "action": "PROXY",
+    "ruleAction": "PROXY",
+    "proxy": "Home SOCKS",
+    "enabled": true
+  },
+  {"processNames": "steam.exe", "targetHosts": "*", "targetPorts": "*", "protocol": "BOTH", "action": "DIRECT", "enabled": false},
+  {"processNames": "*", "targetHosts": "*.tracker.com", "action": "BLOCK", "protocol": "udp"}
+]

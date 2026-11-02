@@ -1,0 +1,16 @@
+# build output
+/bin/
+/dist/
+/frontend/dist/*
+!/frontend/dist/.gitkeep
+/frontend/node_modules/
+*.syso
+/third_party/windivert/
+*.exe
+*.zip
+
+# editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

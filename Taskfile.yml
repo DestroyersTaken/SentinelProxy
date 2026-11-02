@@ -1,0 +1,65 @@
+version: '3'
+
+vars:
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+  OUT: dist/SentinelProxy
+
+tasks:
+  frontend:
+    desc: Install frontend dependencies and build the UI
+    dir: frontend
+    cmds:
+      - pnpm install
+      - pnpm run build
+
+  check:
+    desc: Type-check the UI, vet and test the Go code
+    cmds:
+      - cd frontend && pnpm run check
+      - go vet ./internal/...
+      - go test -race -count=1 ./internal/...
+
+  windivert:
+    desc: Download the WinDivert driver into third_party/windivert
+    status:
+      - test -f third_party/windivert/WinDivert64.sys
+    cmds:
+      - cmd: bash scripts/fetch-windivert.sh
+        platforms: [linux, darwin]
+      - cmd: pwsh -NoProfile -File scripts/fetch-windivert.ps1
+        platforms: [windows]
+
+  build:windows:
+    desc: Build dist/SentinelProxy (Windows x64 app + WinDivert driver). Works from any OS.
+    deps: [frontend, windivert]
+    env:
+      GOOS: windows
+      GOARCH: amd64
+      CGO_ENABLED: "0"
+    cmds:
+      - go run github.com/tc-hib/go-winres@v0.3.3 make --in build/windows/winres.json --out rsrc --arch amd64
+      - go build -trimpath -ldflags "-s -w -H windowsgui -X main.version={{.VERSION}}" -o {{.OUT}}/SentinelProxy.exe .
+      - cmd: cp third_party/windivert/* {{.OUT}}/
+        platforms: [linux, darwin]
+      - cmd: pwsh -NoProfile -Command "Copy-Item third_party/windivert/* {{.OUT}}/"
+        platforms: [windows]
+
+  build:server:
+    desc: Build a headless binary that serves the UI on http://127.0.0.1:8765 (any OS, no GUI libraries)
+    deps: [frontend]
+    env:
+      CGO_ENABLED: "0"
+    cmds:
+      - go build -tags server -trimpath -ldflags "-s -w -X main.version={{.VERSION}}" -o bin/sentinelproxy-server .
+
+  run:server:
+    desc: Run the headless build (open http://127.0.0.1:8765)
+    deps: [build:server]
+    cmds:
+      - ./bin/sentinelproxy-server {{.CLI_ARGS}}
+
+  dev:
+    desc: Run the desktop app in development mode (needs the wails3 CLI)
+    cmds:
+      - wails3 dev

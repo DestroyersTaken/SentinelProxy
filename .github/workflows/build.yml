@@ -88,10 +88,25 @@ jobs:
           go build -trimpath -ldflags "-s -w -H windowsgui -X main.version=$version" -o dist/SentinelProxy/SentinelProxy.exe .
           Copy-Item third_party/windivert/* dist/SentinelProxy/
           Copy-Item README.md dist/SentinelProxy/
+      - name: Installer
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.release }}"
+          if (-not $version) { $version = (git describe --tags --always) }
+          $version = $version -replace '^v', ''
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc /Qp "/DAppVersion=$version" build\windows\installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+          Get-ChildItem dist\*-setup.exe
       - uses: actions/upload-artifact@v4
         with:
           name: SentinelProxy-windows-x64
           path: dist/SentinelProxy
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SentinelProxy-setup
+          path: dist/*-setup.exe
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v') || inputs.release != ''
         shell: pwsh
@@ -106,11 +121,18 @@ jobs:
 
           Rule-based proxy routing for every app: an open alternative to Proxifier.
 
-          **Install:** unzip anywhere and run ``SentinelProxy.exe``. Keep ``WinDivert.dll`` and ``WinDivert64.sys`` next to it.
-          The local SOCKS5/HTTP proxy (127.0.0.1:2080) works right away; click **Restart as administrator** for system-wide capture of every app.
+          **Install:** run ``SentinelProxy-*-setup.exe`` (recommended), or unzip the portable ``.zip`` and run ``SentinelProxy.exe`` (keep ``WinDivert.dll`` and ``WinDivert64.sys`` next to it).
+          The installer can set SentinelProxy to always run as administrator and to start at sign-in without a UAC prompt, so system-wide capture of every app just works.
+          The local SOCKS5/HTTP proxy (127.0.0.1:2080) works without admin rights.
 
           **Note:** some games' anti-cheat may refuse to run while the WinDivert driver is loaded; turn capture off or use the local proxy port for those.
 
           Requires Windows 10/11 x64 with the WebView2 runtime (preinstalled on current Windows).
           "@
-          gh release create $env:TAG $zip --target $env:GITHUB_SHA --title "SentinelProxy $env:TAG" --notes $notes --generate-notes
+          $setup = (Get-ChildItem dist\*-setup.exe | Select-Object -First 1).FullName
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG $zip $setup --clobber
+          } else {
+            gh release create $env:TAG $zip $setup --target $env:GITHUB_SHA --title "SentinelProxy $env:TAG" --notes $notes --generate-notes
+          }

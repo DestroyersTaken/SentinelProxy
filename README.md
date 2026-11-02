@@ -74,8 +74,13 @@ Proxifier works, but its UI is dated, it can't import other tools' configs, and 
 
 ## Getting started (Windows)
 
-1. Download `SentinelProxy-windows-x64` from the latest [GitHub Actions build](../../actions) or Release, and unzip it. Keep `WinDivert.dll` and `WinDivert64.sys` next to `SentinelProxy.exe`.
-2. Run `SentinelProxy.exe`. Without admin rights the **local proxy** works right away. For **system-wide capture** (every app, no setup), click **Restart as administrator** (WinDivert needs it).
+1. Download **`SentinelProxy-<version>-setup.exe`** from [Releases](../../releases) and run it. The installer adds Start Menu and desktop shortcuts, and offers two options:
+   - **Always run as administrator**, needed for system-wide capture of every app.
+   - **Start when I sign in**, which starts in the tray, elevated, with no UAC prompt.
+
+   It installs the WebView2 runtime if it's missing, and the uninstaller removes everything (and optionally your profiles).
+   Prefer portable? Unzip `SentinelProxy-<version>-windows-x64.zip` and run `SentinelProxy.exe`, keeping `WinDivert.dll` and `WinDivert64.sys` next to it.
+2. Without admin rights the **local proxy** works right away. For **system-wide capture**, run as administrator (or click **Restart as administrator** in the app).
 3. **Proxies → Add proxy**, or **Import / Export** to bring in your Proxifier profile.
 4. **Rules → New rule** (templates included), then flip **Proxying on**.
 
@@ -102,6 +107,7 @@ Requirements: Go 1.26+, Node 22 + pnpm, and [Task](https://taskfile.dev).
 
 ```bash
 task build:windows   # dist/SentinelProxy/SentinelProxy.exe + WinDivert (cross-compiles from any OS)
+# installer (on Windows, Inno Setup 6): ISCC.exe /DAppVersion=0.1.1 build\windows\installer.iss -> dist\SentinelProxy-0.1.1-setup.exe
 task build:server    # bin/sentinelproxy-server: headless, UI at http://127.0.0.1:8765
 task check           # svelte-check, go vet, go test -race
 ```

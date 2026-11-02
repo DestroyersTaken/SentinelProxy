@@ -6,6 +6,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish a GitHub Release with this version tag (e.g. v0.1.0); leave empty to just build"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -76,7 +81,9 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          $version = (git describe --tags --always) -replace '^v', ''
+          $version = "${{ inputs.release }}"
+          if (-not $version) { $version = (git describe --tags --always) }
+          $version = $version -replace '^v', ''
           go run github.com/tc-hib/go-winres@v0.3.3 make --in build/windows/winres.json --out rsrc --arch amd64
           go build -trimpath -ldflags "-s -w -H windowsgui -X main.version=$version" -o dist/SentinelProxy/SentinelProxy.exe .
           Copy-Item third_party/windivert/* dist/SentinelProxy/
@@ -86,10 +93,24 @@ jobs:
           name: SentinelProxy-windows-x64
           path: dist/SentinelProxy
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release != ''
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release || github.ref_name }}
         run: |
-          Compress-Archive dist/SentinelProxy/* SentinelProxy-${{ github.ref_name }}-windows-x64.zip
-          gh release create ${{ github.ref_name }} SentinelProxy-${{ github.ref_name }}-windows-x64.zip --generate-notes
+          $zip = "SentinelProxy-$env:TAG-windows-x64.zip"
+          Compress-Archive dist/SentinelProxy/* $zip
+          $notes = @"
+          ## SentinelProxy $env:TAG
+
+          Rule-based proxy routing for every app: an open alternative to Proxifier.
+
+          **Install:** unzip anywhere and run ``SentinelProxy.exe``. Keep ``WinDivert.dll`` and ``WinDivert64.sys`` next to it.
+          The local SOCKS5/HTTP proxy (127.0.0.1:2080) works right away; click **Restart as administrator** for system-wide capture of every app.
+
+          **Note:** some games' anti-cheat may refuse to run while the WinDivert driver is loaded; turn capture off or use the local proxy port for those.
+
+          Requires Windows 10/11 x64 with the WebView2 runtime (preinstalled on current Windows).
+          "@
+          gh release create $env:TAG $zip --target $env:GITHUB_SHA --title "SentinelProxy $env:TAG" --notes $notes --generate-notes
